@@ -5,84 +5,49 @@
 // Укажите правильные типы.
 // По возможности пришлите Ваш вариант в https://codesandbox.io
 
-import React, { useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
+import { User } from "./types/types";
+import UserInfo from "./components/UserInfo/UserInfo";
+import ButtonGetUsers from "./components/ButtonGetUsers/ButtonGetUsers";
+import { getRandomIDUser } from "./services/tools/getRandomIDUsers";
+import getUserAPI from "./services/servicesAPI/getUser";
+import useThrottle from "./components/hooks/useThrottle";
 
-const URL = "https://jsonplaceholder.typicode.com/users";
-
-type Company = {
-  bs: string;
-  catchPhrase: string;
-  name: string;
-};
-
-type User = {
-  id: number;
-  email: string;
-  name: string;
-  phone: string;
-  username: string;
-  website: string;
-  company: Company;
-  address: any
-};
-
-interface IButtonProps {
-  onClick: any;
-}
-
-function Button({ onClick }: IButtonProps): JSX.Element {
-  return (
-    <button type="button" onClick={onClick}>
-      get random user
-    </button>
-  );
-}
-
-interface IUserInfoProps {
-  user: User;
-}
-
-function UserInfo({ user }: IUserInfoProps): JSX.Element {
-  return (
-    <table>
-      <thead>
-        <tr>
-          <th>Username</th>
-          <th>Phone number</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>{user.name}</td>
-          <td>{user.phone}</td>
-        </tr>
-      </tbody>
-    </table>
-  );
-}
 
 function App(): JSX.Element {
-  // const [item, setItem] = useState<Record<number, User>>(null);
+  const [item, setItem] = useState<User | null>(null);
+  const cachedUsersObject = useRef<Record<number, User>>({});
 
-  // const receiveRandomUser = async () => {
-  //   const id = Math.floor(Math.random() * (10 - 1)) + 1;
-  //   const response = await fetch(`${URL}/${id}`);
-  //   const _user = (await response.json()) as User;
-  //   setItem(_user);
-  // };
+  const receiveRandomUser = useCallback(async () => {
 
-  // const handleButtonClick = (
-  //   event: React.MouseEvent<HTMLButtonElement, MouseEvent>
-  // ) => {
-  //   event.stopPropagation();
-  //   receiveRandomUser();
-  // };
+    const id = getRandomIDUser();
+
+    if (cachedUsersObject.current[id]) {
+      setItem(cachedUsersObject.current[id]);
+    } else {
+      try {
+        const user = await getUserAPI(id);
+
+        setItem(user);
+        cachedUsersObject.current[id] = user;
+      } catch (error) {
+        console.error(error);
+      }
+    }
+  }, []);
+
+  const handleButtonClick = (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+    event.stopPropagation();
+    receiveRandomUser();
+  };
+
+  const throttledFn = useThrottle({ callbackFn: handleButtonClick, throttleMs: 2000 });
 
   return (
     <div>
       <header>Get a random user</header>
-      {/* <Button onClick={handleButtonClick} /> */}
-      {/* <UserInfo user={item} /> */}
+      <ButtonGetUsers onClick={throttledFn} />
+      {item && <UserInfo user={item} /> }
     </div>
   );
 }
